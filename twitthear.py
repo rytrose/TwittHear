@@ -23,27 +23,27 @@ class TwittHear:
 
         self.twitterAPI = twitter.Api(consumer_key=twittercredentials.consumer_key, consumer_secret=twittercredentials.consumer_secret,
                       access_token_key=twittercredentials.access_token_key, access_token_secret=twittercredentials.access_token_secret,
-                      input_encoding=None)
+                      input_encoding=None, tweet_mode="extended")
 
         tweets = self.twitterAPI.GetHomeTimeline(trim_user=True)
+        print tweets[0].full_text
 
-        # Instantiates a client
+        # Instantiates a Google NLP client
         cred = service_account.Credentials.from_service_account_file('TwittHear-a204ccf1b234.json')
         cred = cred.with_scopes(
             ['https://www.googleapis.com/auth/cloud-platform'])
         client = language.LanguageServiceClient(credentials=cred)
 
         # The text to analyze
-        text = u'Hello, world!'
+        text = u'I\'m so happy for you!!!!!!'
         document = types.Document(
             content=text,
             type=enums.Document.Type.PLAIN_TEXT)
 
         # Detects the sentiment of the text
-        sentiment = client.analyze_sentiment(document=document).document_sentiment
-
-        print('Text: {}'.format(text))
-        print('Sentiment: {}, {}'.format(sentiment.score, sentiment.magnitude))
+        # sentiment = client.analyze_sentiment(document=document).document_sentiment
+        # print('Text: {}'.format(text))
+        # print('Sentiment: {}, {}'.format(sentiment.score, sentiment.magnitude))
 
     def sendOSCMessage(self, addr, *msgArgs):
         msg = OSC.OSCMessage()
