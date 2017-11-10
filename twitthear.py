@@ -2,12 +2,26 @@ import OSC
 import twitter
 import threading
 import twittercredentials
+import dbcredentials
 import pprint
 from google.cloud import language
 from google.cloud.language import enums
 from google.cloud.language import types
 from google.oauth2 import service_account
 import json
+from peewee import *
+from datetime import date
+
+'''
+    Database and Models
+'''
+db = MySQLDatabase('twitthear', host="localhost", user=dbcredentials.user, passwd=dbcredentials.passwd)
+class User(Model):
+    username = TextField()
+    features = TextField()
+
+    class Meta:
+        database = db
 
 class TwittHear:
     def __init__(self):
@@ -21,12 +35,12 @@ class TwittHear:
 
         self.maxServer.addMsgHandler("/hello", self.testResponder)
 
-        self.twitterAPI = twitter.Api(consumer_key=twittercredentials.consumer_key, consumer_secret=twittercredentials.consumer_secret,
-                      access_token_key=twittercredentials.access_token_key, access_token_secret=twittercredentials.access_token_secret,
-                      input_encoding=None, tweet_mode="extended")
-
-        tweets = self.twitterAPI.GetHomeTimeline(trim_user=True)
-        print tweets[0].full_text
+        # self.twitterAPI = twitter.Api(consumer_key=twittercredentials.consumer_key, consumer_secret=twittercredentials.consumer_secret,
+        #               access_token_key=twittercredentials.access_token_key, access_token_secret=twittercredentials.access_token_secret,
+        #               input_encoding=None, tweet_mode="extended")
+        #
+        # tweets = self.twitterAPI.GetHomeTimeline(trim_user=True)
+        # print tweets[0].full_text[:-24]
 
         # Instantiates a Google NLP client
         cred = service_account.Credentials.from_service_account_file('TwittHear-a204ccf1b234.json')
@@ -45,6 +59,25 @@ class TwittHear:
         # print('Text: {}'.format(text))
         # print('Sentiment: {}, {}'.format(sentiment.score, sentiment.magnitude))
 
+        self.setUpDatabase()
+        self.saveUserFeatures("rytrose", "This is a test.")
+
+    def setUpDatabase(self):
+        try:
+            db.create_tables([User])
+        except:
+            pass
+
+    def saveUserFeatures(self, username, features, override=False):
+        matching_users = User.select().where(
+            User.username == username).count()
+        if matching_users > 0 and not override:
+            print "User: " + username + " already exists."
+        else:
+            new_user = User(username=username, features=features)
+            new_user.save()
+            print "Created user " + username + "."
+
     def sendOSCMessage(self, addr, *msgArgs):
         msg = OSC.OSCMessage()
         msg.setAddress(addr)
@@ -53,5 +86,5 @@ class TwittHear:
 
     def testResponder(self):
         pass
-
+    
 TwittHear()

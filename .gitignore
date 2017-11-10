@@ -1,4 +1,5 @@
 .idea/
 *.pyc
 twittercredentials.py
+dbcredentials.py
 TwittHear-a204ccf1b234.json
