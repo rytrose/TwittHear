@@ -24,7 +24,7 @@ class User(Model):
         database = db
 
 class TweetPhrase(Model):
-    id = BigIntegerField(unique=True)
+    tweet_id = BigIntegerField(unique=True)
     filename = TextField()
 
     class Meta:
@@ -93,18 +93,18 @@ class TwittHear:
     def saveTweetPhraseResponder(self, addr, tags, stuff, source):
         id = long(stuff[0])
         filename = str(stuff[1])
-        tweet_phrase = TweetPhrase(id=id, filename=filename)
+        tweet_phrase = TweetPhrase(tweet_id=id, filename=filename)
         try:
-            tweet_phrase.save(force_insert=True)
+            tweet_phrase.save()
             print "Saved tweet phrase: " + str(stuff[1]) + " for Tweet #" + str(stuff[0])
         except:
-            uq = TweetPhrase.update(filename=filename).where(TweetPhrase.id == id)
+            uq = TweetPhrase.update(filename=filename).where(TweetPhrase.tweet_id == id)
             uq.execute()
             print "Updated tweet phrase: " + str(stuff[1]) + " for Tweet #" + str(stuff[0])
 
     def loadTweetPhrase(self, id):
         try:
-            filename = TweetPhrase.get(TweetPhrase.id == id).filename
+            filename = TweetPhrase.get(TweetPhrase.tweet_id == id).filename
         except:
             print "Tweet with id #" + str(id) + " not found."
             return
