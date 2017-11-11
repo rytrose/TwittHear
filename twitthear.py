@@ -23,17 +23,24 @@ class User(Model):
     class Meta:
         database = db
 
+class TweetPhrase(Model):
+    id = BigIntegerField(unique=True)
+    filename = TextField()
+
+    class Meta:
+        database = db
+
 class TwittHear:
     def __init__(self):
         self.maxServer = OSC.OSCServer(('127.0.0.1', 7000))
         self.maxServerThread = threading.Thread(target=self.maxServer.serve_forever)
-        self.maxServerThread.daemon = True
+        self.maxServerThread.daemon = False
         self.maxServerThread.start()
 
         self.maxClient = OSC.OSCClient()
         self.maxClient.connect(('127.0.0.1', 57121))
 
-        self.maxServer.addMsgHandler("/hello", self.testResponder)
+        self.maxServer.addMsgHandler("/saveTweetPhrase", self.saveTweetPhraseResponder)
 
         # self.twitterAPI = twitter.Api(consumer_key=twittercredentials.consumer_key, consumer_secret=twittercredentials.consumer_secret,
         #               access_token_key=twittercredentials.access_token_key, access_token_secret=twittercredentials.access_token_secret,
@@ -60,11 +67,10 @@ class TwittHear:
         # print('Sentiment: {}, {}'.format(sentiment.score, sentiment.magnitude))
 
         self.setUpDatabase()
-        self.saveUserFeatures("rytrose", "This is a test.")
 
     def setUpDatabase(self):
         try:
-            db.create_tables([User])
+            db.create_tables([TweetPhrase, User])
         except:
             pass
 
@@ -84,7 +90,22 @@ class TwittHear:
         msg.append(*msgArgs)
         self.maxClient.send(msg)
 
-    def testResponder(self):
-        pass
-    
-TwittHear()
+    def saveTweetPhraseResponder(self, addr, tags, stuff, source):
+        id = long(stuff[0])
+        filename = str(stuff[1])
+        tweet_phrase = TweetPhrase(id=id, filename=filename)
+        try:
+            tweet_phrase.save(force_insert=True)
+            print "Saved tweet phrase: " + str(stuff[1]) + " for Tweet #" + str(stuff[0])
+        except:
+            uq = TweetPhrase.update(filename=filename).where(TweetPhrase.id == id)
+            uq.execute()
+            print "Updated tweet phrase: " + str(stuff[1]) + " for Tweet #" + str(stuff[0])
+
+    def loadTweetPhrase(self, id):
+        try:
+            filename = TweetPhrase.get(TweetPhrase.id == id).filename
+        except:
+            print "Tweet with id #" + str(id) + " not found."
+            return
+        self.sendOSCMessage("/loadTweetPhrase", filename)
