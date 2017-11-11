@@ -9,7 +9,7 @@
 			"modernui" : 1
 		}
 ,
-		"rect" : [ 38.0, 85.0, 1423.0, 837.0 ],
+		"rect" : [ 34.0, 77.0, 1432.0, 849.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -118,7 +118,6 @@
 						"tags" : "",
 						"style" : "",
 						"subpatcher_template" : "",
-						"visible" : 1,
 						"boxes" : [ 							{
 								"box" : 								{
 									"id" : "obj-10",
@@ -637,7 +636,6 @@
 					"patching_rect" : [ 338.0, 296.0, 891.0, 261.0 ],
 					"pitcheditrange" : [ "null" ],
 					"playpartialnotes" : 0,
-					"presentation_rect" : [ 0.0, 0.0, 0.0, 261.0 ],
 					"stafflines" : [ 5, 5, 5 ],
 					"textcolor" : [ 0.0, 0.0, 0.0, 1.0 ],
 					"versionnumber" : 7900,
