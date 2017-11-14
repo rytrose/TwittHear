@@ -47,6 +47,7 @@ class TwittHear:
         #               input_encoding=None, tweet_mode="extended")
         #
         # tweets = self.twitterAPI.GetHomeTimeline(trim_user=True)
+        # print tweets[0]
         # print tweets[0].full_text[:-24]
 
         # Instantiates a Google NLP client
@@ -109,3 +110,33 @@ class TwittHear:
             print "Tweet with id #" + str(id) + " not found."
             return
         self.sendOSCMessage("/loadTweetPhrase", filename)
+
+    def addUsername(self, username):
+        to_send = self.sonifyUsername(username)
+        to_send.append(username)
+        self.sendOSCMessage("/addUsername", to_send)
+
+    def sonifyUsername(self, username):
+        notes = []
+
+        for char in username:
+            if ord(char) == 95:
+                # '_'
+                note = 41
+                notes.append(note)
+            elif ord(char) in range(48, 58):
+                # '0-9'
+                note = ord(char) + 20
+                notes.append(note)
+            elif ord(char) in range(97, 123):
+                # 'a-z'
+                note = ord(char) - 19
+                notes.append(note)
+            elif ord(char) in range(65, 91):
+                # 'A-Z'
+                note = ord(char) - 23
+                notes.append(note)
+            else:
+                print "Unrecognized char: " + str(char)
+
+        return notes
