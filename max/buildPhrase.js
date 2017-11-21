@@ -14,7 +14,7 @@ var velocities = ["("];
 
 /* 
  * bang()
- *	arguments: an array of MIDI notes representing a sonified username 
+ *	arguments: an array of MIDI notes representing a sonified tweet 
  *  outputs:
  *   0 - a list of notes to be read by bach.score
  *   1 - a list of durations to be read by bach.score
