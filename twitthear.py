@@ -13,6 +13,7 @@ import json
 from peewee import *
 from geolocation.main import GoogleMaps
 import boto3
+import time
 
 ##############################################################
 # Database and Models
@@ -35,9 +36,81 @@ class TweetPhrase(Model):
 
 
 ##############################################################
+# Listen to Alexa
+##############################################################
+class AlexaThread(threading.Thread):
+    def __init__(self):
+        # Instantiate AWS client
+        region = 'us-east-2'
+        self.queue_url = 'https://sqs.us-east-2.amazonaws.com/640585982580/TwitthearQueue'
+        self.SQSClient = boto3.client('sqs', aws_access_key_id=awscredentials.aws_access_key_id,
+                                      aws_secret_access_key=awscredentials.aws_secret_access_key, region_name=region)
+
+        # Instantiate TwittHear
+        self.twitthear = Twitthear()
+
+    def run(self):
+        while True:
+            response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
+            message = response['Messages'][0]['Body']
+            receipt = response['Messages'][0]['ReceiptHandle']
+
+            message = str(message).lower()
+            parsed_message = message.split(' ')
+
+            command = parsed_message[0]
+            if command == "play":
+                feed = parsed_message[1]
+                if feed == "timeline":
+                    pass
+                elif feed == "search":
+                    search_term = parsed_message[2:]
+                elif feed == "location":
+                    location = parsed_message[2:]
+                else:
+                    print "Play feed " + str(feed) + " not understood."
+            elif command == "pause":
+                pass
+            elif command == "resume":
+                pass
+            elif command == "save":
+                pass
+            else:
+                print "Alexa command " + str(command) + " not understood."
+
+            # Delete message from queue
+            self.SQSClient.delete_message(QueueUrl=self.queue_url, ReceiptHandle=receipt)
+
+            # Sleep a little
+            time.sleep(0.1)
+
+    ##############################################################
+    # SQS Functions
+    ##############################################################
+    '''
+      postMessage()
+        Posts a message to the SQS Queue
+    '''
+    def postMessage(self, message_body):
+        response = self.SQSClient.send_message(QueueUrl=self.queue_url, MessageBody=message_body)
+
+    '''
+      popMessage()
+        Retrieves a message from the SQS Queue
+    '''
+    def popMessage(self):
+        response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
+
+        # last message posted becomes messages
+        message = response['Messages'][0]['Body']
+        receipt = response['Messages'][0]['ReceiptHandle']
+        self.SQSClient.delete_message(QueueUrl=self.queue_url, ReceiptHandle=receipt)
+        return message
+
+##############################################################
 # Main Class
 ##############################################################
-class TwittHear:
+class Twitthear:
     def __init__(self):
         # Setup OSC
         self.maxServer = OSC.OSCServer(('127.0.0.1', 7000))
@@ -54,12 +127,6 @@ class TwittHear:
         # Current tweets to be sonified
         self.tweets = []
         self.tweetIndex = 0
-
-        # Instantiate AWS client
-        region = 'us-east-2'
-        self.queue_url = 'https://sqs.us-east-2.amazonaws.com/640585982580/TwitthearQueue'
-        self.SQSClient = boto3.client('sqs', aws_access_key_id=awscredentials.aws_access_key_id,
-                                      aws_secret_access_key=awscredentials.aws_secret_access_key, region_name=region)
 
         # Instantiate a Google Maps client for geocoding
         self.maps = GoogleMaps(api_key=mapscredentials.api_key)
@@ -100,30 +167,6 @@ class TwittHear:
         msg.setAddress(addr)
         msg.append(*msgArgs)
         self.maxClient.send(msg)
-
-
-    ##############################################################
-    # SQS Functions
-    ##############################################################
-    '''
-      postMessage()
-        Posts a message to the SQS Queue
-    '''
-    def postMessage(self, message_body):
-        response = self.SQSClient.send_message(QueueUrl=self.queue_url, MessageBody=message_body)
-
-    '''
-      popMessage()
-        Retrieves a message from the SQS Queue
-    '''
-    def popMessage(self):
-        response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
-
-        # last message posted becomes messages
-        message = response['Messages'][0]['Body']
-        receipt = response['Messages'][0]['ReceiptHandle']
-        self.SQSClient.delete_message(QueueUrl=self.queue_url, ReceiptHandle=receipt)
-        return message
 
 
     ##############################################################
