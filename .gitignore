@@ -5,3 +5,6 @@ dbcredentials.py
 TwittHear-a204ccf1b234.json
 .ipynb_checkpoints/
 max/*.txt
+aws_iam_credentials.csv
+awscredentials.py
+*.png

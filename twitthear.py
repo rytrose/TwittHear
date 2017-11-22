@@ -4,15 +4,15 @@ import threading
 import twittercredentials
 import dbcredentials
 import mapscredentials
-import pprint
+import awscredentials
 from google.cloud import language
 from google.cloud.language import enums
 from google.cloud.language import types
 from google.oauth2 import service_account
 import json
 from peewee import *
-from datetime import date
 from geolocation.main import GoogleMaps
+import boto3
 
 ##############################################################
 # Database and Models
@@ -55,13 +55,19 @@ class TwittHear:
         self.tweets = []
         self.tweetIndex = 0
 
+        # Instantiate AWS client
+        region = 'us-east-2'
+        self.queue_url = 'https://sqs.us-east-2.amazonaws.com/640585982580/TwitthearQueue'
+        self.SQSClient = boto3.client('sqs', aws_access_key_id=awscredentials.aws_access_key_id,
+                                      aws_secret_access_key=awscredentials.aws_secret_access_key, region_name=region)
+
         # Instantiate a Google Maps client for geocoding
         self.maps = GoogleMaps(api_key=mapscredentials.api_key)
 
         # Instantiate a Twitter client
-        self.twitterAPI = twitter.Api(consumer_key=twittercredentials.consumer_key, consumer_secret=twittercredentials.consumer_secret,
-                      access_token_key=twittercredentials.access_token_key, access_token_secret=twittercredentials.access_token_secret,
-                      input_encoding=None, tweet_mode="extended")
+        self.twitterClient = twitter.Api(consumer_key=twittercredentials.consumer_key, consumer_secret=twittercredentials.consumer_secret,
+                                         access_token_key=twittercredentials.access_token_key, access_token_secret=twittercredentials.access_token_secret,
+                                         input_encoding=None, tweet_mode="extended")
 
         # Instantiate a Google NLP client
         cred = service_account.Credentials.from_service_account_file('TwittHear-a204ccf1b234.json')
@@ -94,6 +100,30 @@ class TwittHear:
         msg.setAddress(addr)
         msg.append(*msgArgs)
         self.maxClient.send(msg)
+
+
+    ##############################################################
+    # SQS Functions
+    ##############################################################
+    '''
+      postMessage()
+        Posts a message to the SQS Queue
+    '''
+    def postMessage(self, message_body):
+        response = self.SQSClient.send_message(QueueUrl=self.queue_url, MessageBody=message_body)
+
+    '''
+      popMessage()
+        Retrieves a message from the SQS Queue
+    '''
+    def popMessage(self):
+        response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
+
+        # last message posted becomes messages
+        message = response['Messages'][0]['Body']
+        receipt = response['Messages'][0]['ReceiptHandle']
+        self.SQSClient.delete_message(QueueUrl=self.queue_url, ReceiptHandle=receipt)
+        return message
 
 
     ##############################################################
@@ -143,17 +173,17 @@ class TwittHear:
     '''
     def getTweets(self, feed, term=''):
         if feed == "timeline":
-            raw_tweets = self.twitterAPI.GetHomeTimeline(count=100)
+            raw_tweets = self.twitterClient.GetHomeTimeline(count=100)
 
         elif feed == "geocode":
             location = self.maps.search(location=term).first()
             if location:
-                raw_tweets = self.twitterAPI.GetSearch(geocode=[location.lat, location.lng, "2mi"], count=100)
+                raw_tweets = self.twitterClient.GetSearch(geocode=[location.lat, location.lng, "2mi"], count=100)
             else:
                 print "Location not found."
 
         elif feed == "search":
-            raw_tweets = self.twitterAPI.GetSearch(term=term, count=100)
+            raw_tweets = self.twitterClient.GetSearch(term=term, count=100)
 
         if len(raw_tweets) > 0:
             self.tweets = [{
