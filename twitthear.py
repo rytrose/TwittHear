@@ -40,6 +40,8 @@ class TweetPhrase(Model):
 ##############################################################
 class AlexaThread(threading.Thread):
     def __init__(self):
+        threading.Thread.__init__(self)
+
         # Instantiate AWS client
         region = 'us-east-2'
         self.queue_url = 'https://sqs.us-east-2.amazonaws.com/640585982580/TwitthearQueue'
@@ -52,37 +54,47 @@ class AlexaThread(threading.Thread):
     def run(self):
         while True:
             response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
-            message = response['Messages'][0]['Body']
-            receipt = response['Messages'][0]['ReceiptHandle']
+            try:
+                message = response['Messages'][0]['Body']
+                receipt = response['Messages'][0]['ReceiptHandle']
+            except:
+                message = None
 
-            message = str(message).lower()
-            parsed_message = message.split(' ')
+            if message:
+                message = str(message).lower()
+                parsed_message = message.split(' ')
 
-            command = parsed_message[0]
-            if command == "play":
-                feed = parsed_message[1]
-                if feed == "timeline":
+                command = parsed_message[0]
+                if command == "play":
+                    feed = parsed_message[1]
+                    if feed == "timeline":
+                        threading.Thread(target=self.twitthear.getTweets, args=('timeline', '')).start()
+                    elif feed == "search":
+                        search_term = ' '.join(parsed_message[2:])
+                        threading.Thread(target=self.twitthear.getTweets, args=('search', search_term)).start()
+                    elif feed == "location":
+                        location = ' '.join(parsed_message[2:])
+                        threading.Thread(target=self.twitthear.getTweets, args=('geocode', location)).start()
+                    else:
+                        print "Play feed " + str(feed) + " not understood."
+                elif command == "pause":
+                    threading.Thread(target=self.twitthear.pause).start()
+                elif command == "resume":
+                    threading.Thread(target=self.twitthear.resume).start()
+                elif command == "back":
+                    threading.Thread(target=self.twitthear.back).start()
+                elif command == "forward":
+                    threading.Thread(target=self.twitthear.forward).start()
+                elif command == "save":
                     pass
-                elif feed == "search":
-                    search_term = parsed_message[2:]
-                elif feed == "location":
-                    location = parsed_message[2:]
                 else:
-                    print "Play feed " + str(feed) + " not understood."
-            elif command == "pause":
-                pass
-            elif command == "resume":
-                pass
-            elif command == "save":
-                pass
-            else:
-                print "Alexa command " + str(command) + " not understood."
+                    print "Alexa command " + str(command) + " not understood."
 
-            # Delete message from queue
-            self.SQSClient.delete_message(QueueUrl=self.queue_url, ReceiptHandle=receipt)
+                # Delete message from queue
+                self.SQSClient.delete_message(QueueUrl=self.queue_url, ReceiptHandle=receipt)
 
             # Sleep a little
-            time.sleep(0.1)
+            time.sleep(0.2)
 
     ##############################################################
     # SQS Functions
@@ -110,7 +122,7 @@ class AlexaThread(threading.Thread):
 ##############################################################
 # Main Class
 ##############################################################
-class Twitthear:
+class Twitthear():
     def __init__(self):
         # Setup OSC
         self.maxServer = OSC.OSCServer(('127.0.0.1', 7000))
