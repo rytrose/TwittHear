@@ -7,9 +7,13 @@
 inlets = 1;
 outlets = 4;
 
-var notes = ["("];
-var durations = ["("];
-var velocities = ["("];
+var userNotes = ["("];
+var userDurations = ["("];
+var userVelocities = ["("];
+
+var tweetNotes = ["("];
+var tweetDurations = ["("];
+var tweetVelocities = ["("];
 
 
 /* 
@@ -22,41 +26,89 @@ var velocities = ["("];
  */
 function bang()
 {
-	notes.push(")");
-	durations.push(")");
-	velocities.push(")");
-	outlet(0, flatten(notes));
-	outlet(1, flatten(durations));
-	outlet(2, flatten(velocities));
-	outlet(3, bang);
-	notes = ["("];
-	durations = ["("];
-	velocities = ["("];
+	userNotes.push(")");
+	userDurations.push(")");
+	userVelocities.push(")");
+	
+	userNotes = flatten(userNotes);
+	userDurations = flatten(userDurations);
+	userVelocities = flatten(userVelocities);
+	
+	tweetNotes.push(")");
+	tweetDurations.push(")");
+	tweetVelocities.push(")");
+	
+	tweetNotes = flatten(tweetNotes);
+	tweetDurations = flatten(tweetDurations);
+	tweetVelocities = flatten(tweetVelocities);
+	
+	var finalNotes = [];
+	finalNotes = finalNotes.concat(tweetNotes);
+	finalNotes = finalNotes.concat(userNotes);
+	
+	var finalDurations = [];
+	finalDurations = finalDurations.concat(tweetDurations);
+	finalDurations = finalDurations.concat(userDurations);
+	
+	var finalVelocities = [];
+	finalVelocities = finalVelocities.concat(tweetVelocities);
+	finalVelocities = finalVelocities.concat(userVelocities);
+		
+	outlet(0, finalNotes);
+	outlet(1, finalDurations);
+	outlet(2, finalVelocities);
+
+	tweetNotes = ["("];
+	tweetDurations = ["("];
+	tweetVelocities = ["("];
+	
+	tweetNotes = ["("];
+	tweetDurations = ["("];
+	tweetVelocities = ["("];
 }
 
 
 /* 
- * addUsername()
- *	arguments: an array of MIDI notes representing a sonified username 
+ * createTweetPhrase()
+ *	inputs: a string of serialized JSON with the tweet information to sonify 
+ *  outputs: a fully formed tweet phrase
+ */
+function createTweetPhrase()
+{
+	tweet = JSON.parse(arguments[0]);
+
+	// Sonify username of tweeter
+	sonifyUsername(tweet.username);
+	
+	// Sonify the content of the tweet
+	
+	// Sonify the mentioned users
+
+}
+
+
+/* 
+ * addUsername(notes)
+ *	inputs: notes - an array of MIDI notes representing a sonified username 
  *  outputs: nothing, but adds a measure to the current phrase
  */
-function addUsername()
+var addUsername = function(username, notes)
 {
 	var measNotes = ["("];
 	var measDurations = ["("];
 	var measVelocities = ["("];
 	
-	for(var i = 0; i < arguments.length - 1; i++) {
-		if(i == arguments.length - 2)
+	for(var i = 0; i < notes.length; i++) {
+		if(i == notes.length - 1)
 		{
-			measNotes.push(arguments[i] * 100);
+			measNotes.push(notes[i] * 100);
 			var dur = 16 - i;
 			measDurations.push(dur.toString() + "/16")
 			measVelocities.push(100);
 		}
 		else
 		{
-			measNotes.push(arguments[i] * 100);
+			measNotes.push(notes[i] * 100);
 			measDurations.push("1/16")
 			measVelocities.push(80);
 		}
@@ -67,13 +119,62 @@ function addUsername()
 	measDurations.push(")");
 	measVelocities.push(")");
 	
-	notes.push(measNotes);
-	durations.push(measDurations);
-	velocities.push(measVelocities);
-	post("Added username @" + arguments[arguments.length - 1]);
+	userNotes.push(measNotes);
+	userDurations.push(measDurations);
+	userVelocities.push(measVelocities);
+	
+	tweetNotes.push(["(", "nil", ")"]);
+	tweetDurations.push(["(", -4, ")"]);
+	tweetVelocities.push(["(", 1, ")"]);	
+
+	post("Added username @" + username);
 	post();
+	
+	outlet(3, bang);	
 }
 
+
+/* 
+ * sonifyUsername(username)
+ *	arguments: username - username to be sonified 
+ *  outputs: nothing, calls addUsername()
+ */
+var sonifyUsername = function(username)
+{
+        var notes = [];
+
+		for(var i = 0; i < username.length; i++) {
+			var char = username.charAt(i);
+			var ord = username.charCodeAt(i);
+			
+            if(ord == 95) {
+                // '_'
+                var note = 41
+                notes.push(note)
+			}
+            else if(ord > 47 && ord < 58) {
+                // '0-9'
+                var note = ord + 20
+                notes.push(note)
+			}
+            else if(ord > 96 && ord < 123) {
+                // 'a-z'
+                var note = ord - 19
+                notes.push(note)
+			}
+            else if(ord > 64 && ord < 91) {
+                // 'A-Z'
+                var note = ord - 23
+                notes.push(note)
+			}
+            else {
+                post("Unrecognized char: " + char);
+				post();
+			}
+		}
+		
+        addUsername(username, notes);
+}
 
 /* 
  * flatten(arr)

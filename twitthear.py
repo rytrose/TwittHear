@@ -14,6 +14,8 @@ from peewee import *
 from geolocation.main import GoogleMaps
 import boto3
 import time
+from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler
 
 ##############################################################
 # Database and Models
@@ -51,6 +53,9 @@ class AlexaThread(threading.Thread):
         # Instantiate TwittHear
         self.twitthear = Twitthear()
 
+        # Run web server
+        threading.Thread(target=runServer).start()
+
     def run(self):
         while True:
             response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
@@ -63,6 +68,8 @@ class AlexaThread(threading.Thread):
             if message:
                 message = str(message).lower()
                 parsed_message = message.split(' ')
+
+                print "Received Alexa command " + message
 
                 command = parsed_message[0]
                 if command == "play":
@@ -308,10 +315,10 @@ class Twitthear():
     '''
     def playTweet(self):
         # Get tweet to play
-        tweet = self.tweets(self.tweetIndex)
+        tweet = self.tweets[self.tweetIndex]
 
         # Check if its phrase exists and load/play it if it does
-        exists = self.loadTweetPhrase(tweet.id)
+        exists = self.loadTweetPhrase(tweet['id'])
 
         if(exists):
             # Tweet phrase exists, and is now playing
@@ -329,11 +336,12 @@ class Twitthear():
     def createTweetPhrase(self, tweet):
         # Create document for Google sentiment analysis
         document = types.Document(
-            content=tweet.text,
+            content=tweet['text'],
             type=enums.Document.Type.PLAIN_TEXT)
 
         # Detect the sentiment of the text
         sentiment = self.NLPClient.analyze_sentiment(document=document).document_sentiment
+
         tweet['sentiment_score'] = sentiment.score
         tweet['sentiment_magnitude'] = sentiment.magnitude
 
@@ -363,34 +371,25 @@ class Twitthear():
         self.sendOSCMessage("/loadTweetPhrase", filename)
         return True
 
-    '''
-    def addUsername(self, username):
-        to_send = self.sonifyUsername(username)
-        to_send.append(username)
-        self.sendOSCMessage("/addUsername", to_send)
 
-    def sonifyUsername(self, username):
-        notes = []
+##############################################################
+# Barebones Web Server
+##############################################################
+class MyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        f = open('index.html', 'r')
+        self.wfile.write(f.read())
+        return
 
-        for char in username:
-            if ord(char) == 95:
-                # '_'
-                note = 41
-                notes.append(note)
-            elif ord(char) in range(48, 58):
-                # '0-9'
-                note = ord(char) + 20
-                notes.append(note)
-            elif ord(char) in range(97, 123):
-                # 'a-z'
-                note = ord(char) - 19
-                notes.append(note)
-            elif ord(char) in range(65, 91):
-                # 'A-Z'
-                note = ord(char) - 23
-                notes.append(note)
-            else:
-                print "Unrecognized char: " + str(char)
-
-        return notes
-    '''
+def runServer(server_class=HTTPServer, handler_class=MyHandler):
+    server_address = ('localhost', 8000)
+    httpd = server_class(server_address, handler_class)
+    try:
+        print("Server running at http://localhost:8000")
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("Stopped server at http://localhost:8000")
+        httpd.socket.close()
