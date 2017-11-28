@@ -8,3 +8,5 @@ max/*.txt
 aws_iam_credentials.csv
 awscredentials.py
 *.png
+node_modules/
+web/bower_components/

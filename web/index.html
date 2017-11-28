@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitthear</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+    <script src="bower_components/osc.js/dist/osc-browser.min.js"></script>
+    <script src="bower_components/lodash/lodash.js"></script>
+
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-2"></div>
+            <div class="col-md-8">
+                <h1 style="text-align: center">Twitthear</h1>
+                <table id="tweets">
+                </table>
+            </div>
+            <div class="col-md-2"></div>
+        </div>
+    </div>
+<script id="twitter-wjs" type="text/javascript" async defer src="//platform.twitter.com/widgets.js"></script>
+</body>
+
+
+<script>
+    /*
+    OSC Communication and Handlers
+    */
+    var port = new osc.WebSocketPort({
+        url: "ws://" + window.location.hostname + ":8081"
+    });
+
+    port.on("message", function (oscMessage) {
+        // Configure handlers here
+        if (oscMessage.address == "/showTweet") saveTweet(oscMessage.args[0]);
+    });
+
+    port.open();
+
+    var closeTweet = function(elem){
+        $(elem).parent().parent().hide("slow");
+    }
+
+    var saveTweet = function(tweet_html){
+        $('#tweets').append("<tr><td>" + tweet_html + "</td><td style='vertical-align: top'><span class='close' onclick='closeTweet(this)' style='margin-top: 10px'>\u00D7</span></td></tr>");
+        twttr.widgets.load();
+    }
+</script>
+
+<style>
+    body {
+        padding-top: 20px;
+        font-family: 'Montserrat', sans-serif;
+    }
+
+    body::after {
+        background: url(twitthear_logo.png);
+        background-repeat: no-repeat;
+        background-position: top center;
+        content: "";
+        opacity: 0.3;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        z-index: -1;
+    }
+
+    .close {
+        background-color: rgba(156, 156, 156, 0.42);
+        padding: 12px 16px 12px 16px;
+    }
+
+    .close:hover {
+        cursor: pointer;
+        background-color: #f44336;
+        color: white;
+    }
+
+    .navbar-center {
+        position: absolute;
+        width: 100%;
+        left: 0;
+        text-align: center;
+        margin:0 auto;
+    }
+</style>
+</html>

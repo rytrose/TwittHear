@@ -53,9 +53,6 @@ class AlexaThread(threading.Thread):
         # Instantiate TwittHear
         self.twitthear = Twitthear()
 
-        # Run web server
-        threading.Thread(target=runServer).start()
-
     def run(self):
         while True:
             response = self.SQSClient.receive_message(QueueUrl=self.queue_url, MaxNumberOfMessages=10)
@@ -93,7 +90,7 @@ class AlexaThread(threading.Thread):
                 elif command == "forward":
                     threading.Thread(target=self.twitthear.forward).start()
                 elif command == "save":
-                    pass
+                    threading.Thread(target=self.twitthear.saveTweet).start()
                 else:
                     print "Alexa command " + str(command) + " not understood."
 
@@ -143,6 +140,9 @@ class Twitthear():
         self.maxServer.addMsgHandler("/saveTweetPhrase", self.saveTweetPhraseResponder)
         self.maxServer.addMsgHandler("/nextTweetPhrase", self.nextTweetPhraseResponder)
 
+        self.nodeClient = OSC.OSCClient()
+        self.nodeClient.connect(('127.0.0.1', 6000))
+
         # Current tweets to be sonified
         self.tweets = []
         self.tweetIndex = 0
@@ -181,12 +181,14 @@ class Twitthear():
           addr - OSC address to send to
           *msgArgs - message contents
     '''
-    def sendOSCMessage(self, addr, *msgArgs):
+    def sendOSCMessage(self, addr, client=0, *msgArgs):
         msg = OSC.OSCMessage()
         msg.setAddress(addr)
         msg.append(*msgArgs)
-        self.maxClient.send(msg)
-
+        if client == 0:
+            self.maxClient.send(msg)
+        else:
+            self.nodeClient.send(msg)
 
     ##############################################################
     # OSC Responder Functions
@@ -218,7 +220,11 @@ class Twitthear():
     '''
     def nextTweetPhraseResponder(self, addr, tags, stuff, source):
         # Get next tweet, called from Max
-        pass
+        if self.tweetIndex == len(self.tweets - 1):
+            self.sendOSCMessage("/finished", 0, ["finished"])
+        else:
+            self.tweetIndex += 1
+            self.playTweet()
 
 
     ##############################################################
@@ -230,8 +236,6 @@ class Twitthear():
         inputs:
           feed - expects 'timeline', 'geocode', or 'search'
           term - search term or location
-        outputs:
-          True if tweets were sucessfully gathered, False otherwise
     '''
     def getTweets(self, feed, term=''):
         if feed == "timeline":
@@ -256,7 +260,11 @@ class Twitthear():
                 'retweets': t.retweet_count,
                 'mentioned_users': [u.screen_name for u in t.user_mentions]
             } for t in raw_tweets]
-            return True
+
+            # Stop previous playback, start playing
+            self.pause()
+            self.tweetIndex = 0
+            self.playTweet()
         else:
             print "No tweets found."
             return False
@@ -282,29 +290,32 @@ class Twitthear():
         Pauses playback in Max
     '''
     def pause(self):
-        self.sendOSCMessage("/pause", ["pause"])
+        self.sendOSCMessage("/pause", 0, ["pause"])
 
     '''
       resume()
         Resumes playback in Max
     '''
     def resume(self):
-        self.sendOSCMessage("/resume", ["resume"])
+        self.sendOSCMessage("/resume", 0, ["resume"])
 
     '''
       back()
         Queues the previously played tweet phrase
     '''
     def back(self):
-        self.sendOSCMessage("/pause", ["pause"])
+        self.sendOSCMessage("/pause", 0, ["pause"])
+        self.tweetIndex = max(0, self.tweetIndex - 1)
+        self.playTweet()
 
     '''
       forward()
         Queues the next tweet phrase
     '''
     def forward(self):
-        self.sendOSCMessage("/pause", ["pause"])
-
+        self.sendOSCMessage("/pause", 0, ["pause"])
+        self.tweetIndex = min(len(self.tweets) - 1, self.tweets + 1)
+        self.playTweet()
 
     ##############################################################
     # Phrase Generation and Functions
@@ -349,7 +360,7 @@ class Twitthear():
         serialized_tweet = json.dumps(tweet)
 
         # Send tweet to Max
-        self.sendOSCMessage("/createTweetPhrase", serialized_tweet)
+        self.sendOSCMessage("/createTweetPhrase", 0, [serialized_tweet])
 
     '''
       loadTweetPhrase()
@@ -368,28 +379,27 @@ class Twitthear():
             return False
 
         # Send the file to load to Max
-        self.sendOSCMessage("/loadTweetPhrase", filename)
+        self.sendOSCMessage("/loadTweetPhrase", 0, [filename])
         return True
 
+    '''
+      saveTweet()
+        Saves a tweet by sending it to the visual interface
+    '''
+    def saveTweet(self):
+        # Get currently playing tweet id
+        try:
+            id = self.tweets[self.tweetIndex]['id']
+        except:
+            print "No tweet currently playing."
+            return
 
-##############################################################
-# Barebones Web Server
-##############################################################
-class MyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        f = open('index.html', 'r')
-        self.wfile.write(f.read())
-        return
+        # Get tweet embed html
+        html = self.twitterClient.GetStatusOembed(status_id=id, omit_script=True)['html']
 
-def runServer(server_class=HTTPServer, handler_class=MyHandler):
-    server_address = ('localhost', 8000)
-    httpd = server_class(server_address, handler_class)
-    try:
-        print("Server running at http://localhost:8000")
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("Stopped server at http://localhost:8000")
-        httpd.socket.close()
+        if(html):
+            # Send html to node
+            self.sendOSCMessage("/showTweet", 1, [html.encode('ascii', 'ignore')])
+        else:
+            print "Unable to get HTML for this tweet."
+            return

@@ -1,0 +1,23 @@
+{
+  "name": "twitthear",
+  "version": "1.0.0",
+  "description": "An audio interface to listen to sonified tweets, in order to view them in a graphical interface later.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rytrose/TwittHear.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rytrose/TwittHear/issues"
+  },
+  "homepage": "https://github.com/rytrose/TwittHear#readme",
+  "dependencies": {
+    "express": "^4.16.2",
+    "osc": "^2.2.0"
+  }
+}
