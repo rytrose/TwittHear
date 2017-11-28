@@ -5,7 +5,7 @@
  */
 
 inlets = 1;
-outlets = 4;
+outlets = 5;
 
 var userNotes = ["("];
 var userDurations = ["("];
@@ -15,6 +15,7 @@ var tweetNotes = ["("];
 var tweetDurations = ["("];
 var tweetVelocities = ["("];
 
+var tweetID = "";
 
 /* 
  * bang()
@@ -57,10 +58,11 @@ function bang()
 	outlet(0, finalNotes);
 	outlet(1, finalDurations);
 	outlet(2, finalVelocities);
+	outlet(3, tweetID);
 
-	tweetNotes = ["("];
-	tweetDurations = ["("];
-	tweetVelocities = ["("];
+	userNotes = ["("];
+	userDurations = ["("];
+	userVelocities = ["("];
 	
 	tweetNotes = ["("];
 	tweetDurations = ["("];
@@ -76,14 +78,21 @@ function bang()
 function createTweetPhrase()
 {
 	tweet = JSON.parse(arguments[0]);
+	tweetID = parseInt(tweet.id).toString();
 
 	// Sonify username of tweeter
 	sonifyUsername(tweet.username);
 	
 	// Sonify the content of the tweet
+	sonifyContent(tweet);
 	
 	// Sonify the mentioned users
+	for(var i = 0; i < tweet.mentioned_users.length; i++){
+		user = tweet.mentioned_users[i];
+		sonifyUsername(user);
+	}
 
+	outlet(4, bang);
 }
 
 
@@ -128,9 +137,7 @@ var addUsername = function(username, notes)
 	tweetVelocities.push(["(", 1, ")"]);	
 
 	post("Added username @" + username);
-	post();
-	
-	outlet(3, bang);	
+	post();	
 }
 
 
@@ -174,6 +181,16 @@ var sonifyUsername = function(username)
 		}
 		
         addUsername(username, notes);
+}
+
+
+/* 
+ * sonifyContent(tweet)
+ *	arguments: tweet - contains the metadata of the tweet to sonify 
+ *  outputs: nothing, adds to current tweet phrase
+ */
+var sonifyContent = function(tweet) {
+	
 }
 
 /* 

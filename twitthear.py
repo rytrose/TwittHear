@@ -14,8 +14,6 @@ from peewee import *
 from geolocation.main import GoogleMaps
 import boto3
 import time
-from http.server import HTTPServer
-from http.server import BaseHTTPRequestHandler
 
 ##############################################################
 # Database and Models
@@ -197,20 +195,20 @@ class Twitthear():
       saveTweetPhraseResponder()
         Saves a tweet phrase to database
         inputs:
-          stuff[0] - id of the tweet to save phrase for
-          stuff[1] - filename of the bach.score file in Max
+          stuff[0] - filename of the tweet to save, formatted as {id}.txt
     '''
     def saveTweetPhraseResponder(self, addr, tags, stuff, source):
-        id = long(stuff[0])
-        filename = str(stuff[1])
+        filename = str(stuff[0])
+        print filename
+        id = long(filename[:-4])
         tweet_phrase = TweetPhrase(tweet_id=id, filename=filename)
         try:
             tweet_phrase.save()
-            print "Saved tweet phrase: " + str(stuff[1]) + " for Tweet #" + str(stuff[0])
+            print "Saved tweet phrase: " + str(filename) + " for Tweet #" + str(id)
         except:
             uq = TweetPhrase.update(filename=filename).where(TweetPhrase.tweet_id == id)
             uq.execute()
-            print "Updated tweet phrase: " + str(stuff[1]) + " for Tweet #" + str(stuff[0])
+            print "Updated tweet phrase: " + str(filename) + " for Tweet #" + str(id)
 
     '''
       nextTweetPhraseResponder()
@@ -220,7 +218,7 @@ class Twitthear():
     '''
     def nextTweetPhraseResponder(self, addr, tags, stuff, source):
         # Get next tweet, called from Max
-        if self.tweetIndex == len(self.tweets - 1):
+        if self.tweetIndex == len(self.tweets) - 1:
             self.sendOSCMessage("/finished", 0, ["finished"])
         else:
             self.tweetIndex += 1
