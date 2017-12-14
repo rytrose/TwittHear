@@ -14,21 +14,18 @@ from peewee import *
 from geolocation.main import GoogleMaps
 import boto3
 import time
+import sys
+import nltk
+import re
+from nltk.corpus import cmudict
 
 ##############################################################
 # Database and Models
 ##############################################################
 db = MySQLDatabase('twitthear', host="localhost", user=dbcredentials.user, passwd=dbcredentials.passwd)
 
-class User(Model):
-    username = TextField()
-    features = TextField()
-
-    class Meta:
-        database = db
-
 class TweetPhrase(Model):
-    tweet_id = BigIntegerField(unique=True)
+    tweet_id = TextField(unique=True)
     filename = TextField()
 
     class Meta:
@@ -159,6 +156,15 @@ class Twitthear():
             ['https://www.googleapis.com/auth/cloud-platform'])
         self.NLPClient = language.LanguageServiceClient(credentials=cred)
 
+        # Instantiate CMU Pronunciation Dictionary
+        try:
+            self.dict = cmudict.dict()
+        except:
+            print "Downloading cmudict..."
+            nltk.download('cmudict')
+            print "Downloaded cmudict."
+            self.dict = cmudict.dict()
+
         # Attempt to create databases
         self.setUpDatabase()
 
@@ -168,7 +174,7 @@ class Twitthear():
     '''
     def setUpDatabase(self):
         try:
-            db.create_tables([TweetPhrase, User])
+            db.create_tables([TweetPhrase])
         except:
             pass
 
@@ -199,8 +205,7 @@ class Twitthear():
     '''
     def saveTweetPhraseResponder(self, addr, tags, stuff, source):
         filename = str(stuff[0])
-        print filename
-        id = long(filename[:-4])
+        id = str(filename[:-4])
         tweet_phrase = TweetPhrase(tweet_id=id, filename=filename)
         try:
             tweet_phrase.save()
@@ -251,7 +256,7 @@ class Twitthear():
 
         if len(raw_tweets) > 0:
             self.tweets = [{
-                'id': t.id,
+                'id': str(t.id),
                 'username': t.user.screen_name,
                 'text': t.full_text,
                 'favorites': t.favorite_count,
@@ -266,18 +271,6 @@ class Twitthear():
         else:
             print "No tweets found."
             return False
-
-    '''
-    def saveUserFeatures(self, username, features, override=False):
-        matching_users = User.select().where(
-            User.username == username).count()
-        if matching_users > 0 and not override:
-            print "User: " + username + " already exists."
-        else:
-            new_user = User(username=username, features=features)
-            new_user.save()
-            print "Created user " + username + "."
-    '''
 
 
     ##############################################################
@@ -303,6 +296,7 @@ class Twitthear():
     '''
     def back(self):
         self.sendOSCMessage("/pause", 0, ["pause"])
+        print "Back, tweetIndex going from " + str(self.tweetIndex) + "to " + str(max(0, self.tweetIndex - 1))
         self.tweetIndex = max(0, self.tweetIndex - 1)
         self.playTweet()
 
@@ -312,7 +306,7 @@ class Twitthear():
     '''
     def forward(self):
         self.sendOSCMessage("/pause", 0, ["pause"])
-        self.tweetIndex = min(len(self.tweets) - 1, self.tweets + 1)
+        self.tweetIndex = min(len(self.tweets) - 1, self.tweetIndex + 1)
         self.playTweet()
 
     ##############################################################
@@ -331,6 +325,7 @@ class Twitthear():
 
         if(exists):
             # Tweet phrase exists, and is now playing
+            print "Playing " + str(tweet['id'])
             return
         else:
             # Tweet doesn't exist, create/play new tweet phrase
@@ -349,16 +344,42 @@ class Twitthear():
             type=enums.Document.Type.PLAIN_TEXT)
 
         # Detect the sentiment of the text
-        sentiment = self.NLPClient.analyze_sentiment(document=document).document_sentiment
+        try:
+            sentiment = self.NLPClient.analyze_sentiment(document=document).document_sentiment
+            tweet['sentiment_score'] = sentiment.score
+            tweet['sentiment_magnitude'] = sentiment.magnitude
+        except:
+            print "Language not understood for sentiment analysis."
+            tweet['sentiment_score'] = 0
+            tweet['sentiment_magnitude'] = 0
 
-        tweet['sentiment_score'] = sentiment.score
-        tweet['sentiment_magnitude'] = sentiment.magnitude
+        tweet['syllables'] = []
+
+        split = tweet['text'].encode('ascii', 'ignore').split(' ')
+
+        for w in split:
+            try:
+                # Strip of non-alphanumeric characters
+                word = re.sub('[\W_]', '', w)
+
+                num_syl = self.nsyl(word)
+                tweet['syllables'].append(num_syl)
+            except:
+                try:
+                    pass
+                    # print "Could not get the number of syllables in " + str(w)
+                except:
+                    pass
+                    # print "Could not get the number of syllables in word."
 
         # Serialize the tweet
         serialized_tweet = json.dumps(tweet)
 
         # Send tweet to Max
         self.sendOSCMessage("/createTweetPhrase", 0, [serialized_tweet])
+
+    def nsyl(self, word):
+        return [len(list(y for y in x if y[-1].isdigit())) for x in self.dict[word.lower()]][0]
 
     '''
       loadTweetPhrase()
