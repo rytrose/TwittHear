@@ -255,6 +255,7 @@ class Twitthear():
             raw_tweets = self.twitterClient.GetSearch(term=term, count=100)
 
         if len(raw_tweets) > 0:
+
             self.tweets = [{
                 'id': str(t.id),
                 'username': t.user.screen_name,

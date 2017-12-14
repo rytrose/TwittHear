@@ -28,13 +28,7 @@ var WHOLETONE = [0, 2, 4, 6, 8, 10, 12, 14, 16];
 var usernameChordIn = []
 var contentChordIn = []
 
-var currentMeasure = {
-	measBeats: 0,
-	measNotes: ["("],
-	measDurations: ["("],
-	measVelocities: ["("],
-	measTies: ["("]
-}	
+var measBeats = 0;	
 
 /* 
  * bang()
@@ -45,42 +39,50 @@ var currentMeasure = {
  *   2 - a list of velocities to be read by bach.score
  */
 function bang()
-{
-	userNotes.push(")");
-	userDurations.push(")");
-	userVelocities.push(")");
-	userTies.push(")");
-	
+{	
 	userNotes = flatten(userNotes);
 	userDurations = flatten(userDurations);
 	userVelocities = flatten(userVelocities);
 	userTies = flatten(userTies);
-	
-	tweetNotes.push(")");
-	tweetDurations.push(")");
-	tweetVelocities.push(")");
-	tweetTies.push(")");
+
+	userNotes.pop();
+	userDurations.pop();
+	userVelocities.pop();
+	userTies.pop();
 	
 	tweetNotes = flatten(tweetNotes);
 	tweetDurations = flatten(tweetDurations);
 	tweetVelocities = flatten(tweetVelocities);
 	tweetTies = flatten(tweetTies);
 	
-	var finalNotes = [];
+	tweetNotes.pop();
+	tweetDurations.pop();
+	tweetVelocities.pop();
+	tweetTies.pop();
+	
+	var finalNotes = ["("];
 	finalNotes = finalNotes.concat(tweetNotes);
+	finalNotes = finalNotes.concat([")", "("]);
 	finalNotes = finalNotes.concat(userNotes);
+	finalNotes.push(")");
 	
-	var finalDurations = [];
+	var finalDurations = ["("];
 	finalDurations = finalDurations.concat(tweetDurations);
+	finalDurations = finalDurations.concat([")", "("]);
 	finalDurations = finalDurations.concat(userDurations);
+	finalDurations.push(")");
 	
-	var finalVelocities = [];
+	var finalVelocities = ["("];
 	finalVelocities = finalVelocities.concat(tweetVelocities);
+	finalVelocities = finalVelocities.concat([")", "("]);
 	finalVelocities = finalVelocities.concat(userVelocities);
+	finalVelocities.push(")");
 	
-	var finalTies = [];
+	var finalTies = ["("];
 	finalTies = finalTies.concat(tweetTies);
+	finalTies = finalTies.concat([")", "("]);
 	finalTies = finalTies.concat(userTies);
+	finalTies.push(")");
 	
 	outlet(0, finalNotes);
 	outlet(1, finalDurations);
@@ -117,14 +119,8 @@ function createTweetPhrase()
 		post();
 	}
 
-	// Init current measure
-	currentMeasure = {
-		measBeats: 0,
-		measNotes: ["("],
-		measDurations: ["("],
-		measVelocities: ["("],
-		measTies: ["("]
-	}
+	// Init first measure
+	measBeats = 0;
 
 	// Sonify username of tweeter
 	sonifyUsername(tweet.username, 1);
@@ -141,6 +137,9 @@ function createTweetPhrase()
 		}
 		else sonifyUsername(user, 0.5);
 	}
+
+	// End the last measure
+	if(measBeats != 0) measBeats = addToMeasure("tweet", measBeats, "nil", -1, 1 - measBeats);
 
 	outlet(5, bang);
 }
@@ -220,9 +219,9 @@ var sonifyUsername = function(username, len)
 	for(var i in usernameChordIn) chord3.push(usernameChordIn[i]);
 	chord3.push(")");	
 	
-	currentMeasure = addToMeasure("user", currentMeasure, chord1, 100, 0.0625)
-	currentMeasure = addToMeasure("user", currentMeasure, chord2, 100, 0.0625)
-	currentMeasure = addToMeasure("user", currentMeasure, chord3, 100, 0.25)
+	measBeats = addToMeasure("user", measBeats, chord1, 100, 0.0625)
+	measBeats = addToMeasure("user", measBeats, chord2, 100, 0.0625)
+	measBeats = addToMeasure("user", measBeats, chord3, 100, 0.25)
 }
 
 
@@ -294,11 +293,22 @@ var sonifyContent = function(tweet) {
 	// Establish velocity possibilities
 	var velocities = [];
 	
-	if(tweet.sentiment_magnitude > 0.8) for(var i = 90; i < 111; i += 2) velocities.push(i);
-	if(tweet.sentiment_magnitude > 0.6 && tweet.sentiment_magnitude <= 0.8) for(var i = 70; i < 91; i += 2) velocities.push(i);	
-	if(tweet.sentiment_magnitude > 0.4 && tweet.sentiment_magnitude <= 0.6) for(var i = 50; i < 71; i += 2) velocities.push(i);	
-	if(tweet.sentiment_magnitude > 0.2 && tweet.sentiment_magnitude <= 0.4) for(var i = 30; i < 51; i += 2) velocities.push(i);	
-	if(tweet.sentiment_magnitude > 0 && tweet.sentiment_magnitude <= 0.2) for(var i = 10; i < 31; i += 2) velocities.push(i);	
+	// Set effects
+	var ctlout = this.patcher.getnamed("ctlout");
+	
+	// Delay for number of retweets
+	ctlout.message("in1", 1);
+	ctlout.message(Math.pow(tweet.retweets, 1/1.2));
+	
+	// Chorus for number of favorites
+	ctlout.message("in1", 2);
+	ctlout.message(Math.pow(tweet.favorites, 1/1.2));
+	
+	if(tweet.sentiment_magnitude > 0.8) for(var i = 100; i < 111; i += 2) velocities.push(i);
+	if(tweet.sentiment_magnitude > 0.6 && tweet.sentiment_magnitude <= 0.8) for(var i = 90; i < 101; i += 2) velocities.push(i);	
+	if(tweet.sentiment_magnitude > 0.4 && tweet.sentiment_magnitude <= 0.6) for(var i = 80; i < 91; i += 2) velocities.push(i);	
+	if(tweet.sentiment_magnitude > 0.2 && tweet.sentiment_magnitude <= 0.4) for(var i = 70; i < 81; i += 2) velocities.push(i);	
+	if(tweet.sentiment_magnitude > 0 && tweet.sentiment_magnitude <= 0.2) for(var i = 60; i < 71; i += 2) velocities.push(i);	
 	
 	for(var i = 0; i < tweet.syllables.length; i++) {		
 		var numNotes = tweet.syllables[i];
@@ -316,18 +326,15 @@ var sonifyContent = function(tweet) {
 			var dur = chooseRandom([0.0625, 0.0625]);
 			
 			// Add the syllable chord
-			currentMeasure = addToMeasure("tweet", currentMeasure, cents, vel, dur);
+			measBeats = addToMeasure("tweet", measBeats, cents, vel, dur);
 		}
 		
 		// Add rest after each word
-		currentMeasure = addToMeasure("tweet", currentMeasure, "nil", -1, wordRest);
+		measBeats = addToMeasure("tweet", measBeats, "nil", -1, wordRest);
 	}
 	
 	// Reset harmony
 	contentChordIn = [];
-	
-	// End current measure
-	if(currentMeasure.measBeats != 0) currentMeasure = addToMeasure("tweet", currentMeasure, "nil", -1, 1 - currentMeasure.measBeats);
 }
 
 
@@ -396,10 +403,10 @@ var setContentHarmony = function(tweet) {
 	conHMessager.message("setChord4", chord4);
 	conHMessager.message("setChord5", chord5);
 	
-	if(tweet.sentiment_score > 0 && tweet.sentiment_magnitude > 0) conHMessager.message("setPoint", [0.5 + (Math.random()/2),  Math.random()/2]);
+	if(tweet.sentiment_score < 0 && tweet.sentiment_magnitude < 0) conHMessager.message("setPoint", [Math.random()/2,  0.5 + (Math.random()/2)]);
 	else if(tweet.sentiment_score > 0 && tweet.sentiment_magnitude < 0) conHMessager.message("setPoint", [0.5 + (Math.random()/2),  0.5 + (Math.random()/2)]);
 	else if(tweet.sentiment_score < 0 && tweet.sentiment_magnitude > 0) conHMessager.message("setPoint", [Math.random()/2,  Math.random()/2]);
-	else conHMessager.message("setPoint", [Math.random()/2,  0.5 + (Math.random()/2)]);
+	else conHMessager.message("setPoint", [0.5 + (Math.random()/2),  Math.random()/2]);
 }
 
 
@@ -415,45 +422,80 @@ var setContentHarmony = function(tweet) {
  *			dur - the duration value to add to the measure
  *  outputs: nothing, but adds to the measure buffers
  */
-var addToMeasure = function(voice, currentMeasure, cents, vel, dur) {
+var addToMeasure = function(voice, measBeats, cents, vel, dur) {
+	var userCents = "nil";
+	var userVel = -1;
+	var userDur = dur;
+	
+	var tweetCents = "nil";
+	var tweetVel = -1;
+	var tweetDur = dur;
+
+	if(voice == "user") {
+		userCents = cents;
+		userVel = vel;
+	}
+	else {
+		tweetCents = cents;
+		tweetVel = vel;
+	}	
+	
 
 	// Add rhythm to measure, see if it needs to be tied
-	currentMeasure.measBeats += dur;
+	measBeats += dur;
 	
-	if(currentMeasure.measBeats >= 1) {
+	if(measBeats >= 1) {
 		// Needs to be tied
 		// Find the duration of the extra
-		var extra = currentMeasure.measBeats - 1;
+		var extra = measBeats - 1;
 		var thisMeas = dur - extra;
 		
 		// Finish this measure
-		currentMeasure.measNotes.push(cents);
-		currentMeasure.measDurations.push(decimalToFrac(thisMeas));
-		currentMeasure.measVelocities.push(vel);
-		if(currentMeasure.measBeats == 1) currentMeasure.measTies.push(0); 
-		else currentMeasure.measTies.push(1);
+		userNotes.push(userCents);
+		userDurations.push(decimalToFrac(thisMeas));
+		userVelocities.push(userVel);
+		tweetNotes.push(tweetCents);
+		tweetDurations.push(decimalToFrac(thisMeas));
+		tweetVelocities.push(tweetVel);
 		
-		currentMeasure = finishMeasure(voice, currentMeasure);
 		
-		currentMeasure.measBeats = extra;	
+		if(measBeats == 1) {
+			userTies.push(0);
+			tweetTies.push(0);
+		}
+		else { 
+			userTies.push(1);
+			tweetTies.push(1);
+		}
+		
+		measBeats = finishMeasure();
 		
 		// Start new measure
 		if(extra != 0) {
-			currentMeasure.measNotes.push(cents);
-			currentMeasure.measDurations.push(decimalToFrac(extra));
-			currentMeasure.measVelocities.push(vel);
-			currentMeasure.measTies.push(0);
+			userNotes.push(userCents);
+			userDurations.push(decimalToFrac(extra));
+			userVelocities.push(userVel);
+			userTies.push(1);
+			tweetNotes.push(tweetCents);
+			tweetDurations.push(decimalToFrac(extra));
+			tweetVelocities.push(tweetVel);
+			tweetTies.push(1);
+			measBeats = extra;
 		}
 	}
 	else {
 		// Does not need to be tied
-		currentMeasure.measNotes.push(cents);
-		currentMeasure.measDurations.push(decimalToFrac(dur));
-		currentMeasure.measVelocities.push(vel);
-		currentMeasure.measTies.push(0);
+		userNotes.push(userCents);
+		userDurations.push(decimalToFrac(userDur));
+		userVelocities.push(userVel);
+		userTies.push(0);
+		tweetNotes.push(tweetCents);
+		tweetDurations.push(decimalToFrac(tweetDur));
+		tweetVelocities.push(tweetVel);
+		tweetTies.push(0);
 	}
 	
-	return currentMeasure;
+	return measBeats;
 }
 
 
@@ -466,42 +508,18 @@ var addToMeasure = function(voice, currentMeasure, cents, vel, dur) {
  *          measTies - the ties of the measure
  *  outputs: nothing, but resets the measure
  */
-var finishMeasure = function(voice, currentMeasure){
+var finishMeasure = function(){
+	userNotes.push([")", "("]);
+	userDurations.push([")", "("]);
+	userVelocities.push([")", "("]);
+	userTies.push([")", "("]);
 	
-	currentMeasure.measNotes.push(")");
-	currentMeasure.measDurations.push(")");
-	currentMeasure.measVelocities.push(")");
-	currentMeasure.measTies.push(")");
-	
-	if(voice == "user") {
-		userNotes.push(currentMeasure.measNotes);
-		userDurations.push(currentMeasure.measDurations);
-		userVelocities.push(currentMeasure.measVelocities);
-		userTies.push(currentMeasure.measTies);
-		
-		tweetNotes.push(["(", "nil", ")"]);
-		tweetDurations.push(["(", -1, ")"]);
-		tweetVelocities.push(["(", 1, ")"]);
-		tweetTies.push(["(", 0, ")"]);
-	} else {
-		tweetNotes.push(currentMeasure.measNotes);
-		tweetDurations.push(currentMeasure.measDurations);
-		tweetVelocities.push(currentMeasure.measVelocities);
-		tweetTies.push(currentMeasure.measTies);
-		
-		userNotes.push(["(", "nil", ")"]);
-		userDurations.push(["(", -1, ")"]);
-		userVelocities.push(["(", 1, ")"]);
-		userTies.push(["(", 0, ")"]);
-	}
-	
-	return {
-		measBeats: 0,
-		measNotes: ["("],
-		measDurations: ["("],
-		measVelocities: ["("],
-		measTies: ["("]		
-	}
+	tweetNotes.push([")", "("]);
+	tweetDurations.push([")", "("]);
+	tweetVelocities.push([")", "("]);
+	tweetTies.push([")", "("]);
+
+	return 0;
 }
 
 
